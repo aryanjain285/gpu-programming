@@ -1,0 +1,67 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────────────────────
+# PBS submission script for NSCC ASPIRE 2A (A100 GPUs)
+#
+# Submit with:   qsub scripts/submit_nscc.pbs
+# Check status:  qstat -u $USER
+# Cancel:        qdel <jobid>
+#
+# Output files:  pipeline_job.o<jobid>   (stdout)
+#                pipeline_job.e<jobid>   (stderr)
+# ─────────────────────────────────────────────────────────────────────────────
+
+#PBS -N pipeline_job
+#PBS -q normal
+#PBS -l select=1:ncpus=8:ngpus=2:mem=32gb
+#PBS -l walltime=00:30:00
+#PBS -P 13003581                       # <-- REPLACE with your NSCC project ID
+#PBS -j oe
+#PBS -o pipeline_job.log
+
+# ── Environment ──────────────────────────────────────────────────────────────
+module purge
+module load cuda/12.2.2                # adjust to whatever ASPIRE 2A currently has
+                                       # (run `module avail cuda` on a login node)
+
+# ── Move to the directory the job was submitted from ────────────────────────
+cd "$PBS_O_WORKDIR" || exit 1
+
+echo "============================================================"
+echo "Job started on $(hostname) at $(date)"
+echo "Working dir: $PWD"
+echo "GPUs visible:"
+nvidia-smi --query-gpu=index,name,compute_cap --format=csv
+echo "============================================================"
+
+# ── Build ────────────────────────────────────────────────────────────────────
+make clean
+make build || { echo "Build failed"; exit 1; }
+
+# ── Run the multi-GPU pipeline and verify outputs ───────────────────────────
+echo ""
+echo "─── Running multi-GPU pipeline ─────────────────────────────"
+time ./pipeline --input data/input --output output
+
+echo ""
+echo "─── Checking outputs against reference ─────────────────────"
+python3 scripts/check_outputs.py \
+    --output output \
+    --reference data/expected_output/stage-3 \
+    --tolerance 2
+
+# ── Single-GPU timing run (for the speedup analysis in the report) ──────────
+echo ""
+echo "─── Single-GPU timing run ──────────────────────────────────"
+time ./pipeline --input data/input --output output --single-gpu
+
+# ── Nsight Systems profile (for the stream-overlap analysis) ────────────────
+echo ""
+echo "─── Nsight Systems profile ─────────────────────────────────"
+nsys profile --trace=cuda,nvtx --force-overwrite=true \
+    --output=pipeline_profile \
+    ./pipeline --input data/input --output output
+
+echo ""
+echo "============================================================"
+echo "Job finished at $(date)"
+echo "============================================================"
