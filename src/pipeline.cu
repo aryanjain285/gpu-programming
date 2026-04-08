@@ -99,7 +99,9 @@ __global__ void sobelKernel(
     }
 
     float mag = sqrtf(gx * gx + gy * gy);
-    out[y * width + x] = (uint8_t)min(max((int)roundf(mag), 0), 255);
+    // Reference uses truncation, not roundf — verified bit-exact against
+    // data/expected_output/stage-2 across 5 test images.
+    out[y * width + x] = (uint8_t)min(max((int)mag, 0), 255);
 }
 
 

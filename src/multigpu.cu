@@ -75,7 +75,7 @@ static void process_batch_on_device(std::vector<ImageEntry>& sub_batch, int devi
 
         thrust::device_ptr<unsigned int> hist_ptr(d_hist[i]);
         thrust::device_ptr<float>        cdf_ptr(d_cdf[i]);
-        thrust::inclusive_scan(hist_ptr, hist_ptr + 256, cdf_ptr);
+        thrust::exclusive_scan(hist_ptr, hist_ptr + 256, cdf_ptr);
 
         // Find cdf_min on host
         float h_cdf[256];
