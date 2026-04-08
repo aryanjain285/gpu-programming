@@ -38,7 +38,7 @@ OUTPUT_DIR  := output
 build: $(TARGET)
 
 $(TARGET): $(SRCS)
-	$(NVCC) $(NVCC_FLAGS) -o $@ $^ -lpthread
+	$(NVCC) $(NVCC_FLAGS) -o $@ $^ -lpthread -lstdc++fs
 
 # Run the pipeline on all test images.
 run: build
